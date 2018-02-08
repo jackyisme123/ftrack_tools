@@ -1,0 +1,15 @@
+import ftrack_api
+
+docker exec -it 6f7fdd55c3dd /bin/ash
+docker rm $(docker ps -a -q)
+docker rmi $(docker images -q)
+docker build -t test .
+docker stop $(docker ps -a -q)
+docker run -p 8080:8080 test #(frontend)
+
+atlas-run --jvmargs '-Xmx2g -XX:MaxPermSize=1g'
+
+mysql:root root
+
+User:admin admin
+

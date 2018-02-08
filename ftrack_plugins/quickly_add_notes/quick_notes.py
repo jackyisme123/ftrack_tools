@@ -1,5 +1,4 @@
 from Tkinter import *
-
 import ftrack_api
 import tkMessageBox
 import collections
@@ -85,10 +84,9 @@ class quick_notes_gui:
         user_name = self.choose_user_entry.get()
         api_key = self.choose_key_entry.get()
         self.server_url = self.choose_url_entry.get()
-        self.server_url = 'http://192.168.9.82/'
-        api_key = 'afe3ba42-baba-46b1-b47b-35206f34488f'
-        user_name = 'yuan.cui'
-        project_name = 'testing'
+        # unify url format
+        if self.server_url[-1] == '/':
+            self.server_url = self.server_url[:-1]
         try:
             self.session = get_session(self.server_url, api_key, user_name)
             self.user = get_user(self.session, user_name)
@@ -153,6 +151,7 @@ class quick_notes_gui:
             task_delete_button.bind("<ButtonPress-1>", lambda event: self.delete_task(event))
             task_note_text = Text(task_frame, height=5, width=100)
             task_note_text.bind("<Leave>", lambda event, task_name= task_name: self.focusOut(event, task_name))
+            task_note_text.bind("<FocusOut>", lambda event, task_name= task_name: self.focusOut(event, task_name))
             task_delete_button.grid(row=0, column=1, padx=10)
             task_name_label.grid(row=0, column=0)
             task_note_text.grid(row=1, column=0, columnspan=2, pady=5)
@@ -222,7 +221,6 @@ class quick_notes_gui:
                     "user_id": user_id,
                     "notes": self.save_message
                 }, f)
-                print 'save'
             return 1
         return 0
 
@@ -254,7 +252,6 @@ class quick_notes_gui:
             tkMessageBox.showinfo("Warning", "Cannot load with different user account")
             return
         self.project = self.session.query("Project where id is {0}".format(project_id)).one()
-        # self.user = self.session.query("User where id is {0}".format(user_id)).one()
         self.tasks = get_tasks_from_project(self.project)
         self.save_message = notes_msg
         self.search_labelframe.grid_remove()
@@ -325,6 +322,9 @@ def onFrameConfigure(canvas):
     canvas.configure(scrollregion=canvas.bbox("all"))
 
 def submit_info_to_ftrack(info, session, user, project):
+    '''submit info into ftrack server'''
+    # flag for telling empty submission
+    flag = False
     catagory = session.query("NoteCategory where name is 'Client feedback'").one()
     for key, value in info.items():
         task_name = key
@@ -333,19 +333,22 @@ def submit_info_to_ftrack(info, session, user, project):
         # empty note won't be submitted
         if value != '':
             task.create_note(note_content, user, category=catagory)
-    try:
-        session.commit()
-        tkMessageBox.showinfo("Successful", "Successful submission!")
-    except Exception:
-        tkMessageBox.showinfo("Failure", "Sorry, your notes are not submitted!")
-        session.rollback()
-        raise
+            flag=True
+    if flag:
+        try:
+            session.commit()
+            tkMessageBox.showinfo("Successful", "Successful submission!")
+        except Exception:
+            tkMessageBox.showinfo("Failure", "Sorry, your notes are not submitted!")
+            session.rollback()
+            raise
+    else:
+        tkMessageBox.showinfo("Warning", "No submission content!")
 
 class ThreadJob(threading.Thread):
     '''for auto save job'''
     def __init__(self,callback,event,interval):
         '''runs the callback function after interval seconds
-
         :param callback:  callback function to invoke
         :param event: external event for controlling the update operation
         :param interval: time in seconds after which are required to fire the callback
@@ -357,11 +360,12 @@ class ThreadJob(threading.Thread):
         self.interval = interval
         super(ThreadJob,self).__init__()
         self._stop_event = threading.Event()
+        # is_running shows the status of thread event
         self.is_running = False
 
     def run(self):
+        '''run callback function by interval time'''
         self.is_running = True
-        print "run"
         while not self.event.wait(self.interval):
             if self.stopped():
                 break
@@ -369,7 +373,6 @@ class ThreadJob(threading.Thread):
         self._stop_event = threading.Event()
 
     def stop(self):
-        print "stop"
         self.is_running = False
         self._stop_event.set()
 

@@ -15,5 +15,5 @@
 -- auto save
 ## status on multiply entities (plugin)
 -- change states on multiply entities with same type
-# delete all assignee & delete assignee(script)
+## delete all assignee & delete assignee(script)
 -- delete assignee from ftack server

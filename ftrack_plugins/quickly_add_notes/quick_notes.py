@@ -7,22 +7,20 @@ import cPickle as pickle
 import threading
 
 # ftrack configuration
-SERVER_URL = 'http://192.168.9.82/'
-API_KEY = '72baaed0-1816-11e7-8c7e-005056a84326'
-API_USER = 'root'
-AUTO_SAVE_TIME = 10
+AUTO_SAVE_TIME = 3
 
 class quick_notes_gui:
     '''GUI for quick notes'''
-    task_frame_count = 0
-    submit_info = {}
-    save_message = collections.OrderedDict()
-    project = None
-    user = None
-    search_labelframe = None
 
-    def __init__(self, app, session):
+    def __init__(self, app):
         '''set GUI'''
+        self.task_frame_count = 0
+        self.submit_info = {}
+        self.save_message = collections.OrderedDict()
+        self.project = None
+        self.user = None
+        self.search_labelframe = None
+        self.server_url = None
         #destroy previous GUI first
         for widget in app.winfo_children():
             widget.destroy()
@@ -40,25 +38,32 @@ class quick_notes_gui:
         app.config(menu=menu)
         fileMenu = Menu(menu)
         menu.add_cascade(label='File', menu=fileMenu)
-        fileMenu.add_command(label='New', command=lambda (app, session) =(app, session):self.new_project((app, session)))
-        fileMenu.add_command(label='Save', command= self.save_project)
-        fileMenu.add_command(label='Load', command = self.load_project)
+        fileMenu.add_command(label='New', command=lambda app =app:self.new_project(app))
+        fileMenu.add_command(label='Save', command=self.save_project)
+        fileMenu.add_command(label='Load', command=self.load_project)
         fileMenu.add_separator()
         fileMenu.add_command(label='Quit', command=lambda app=app:self.quit(app))
-        self.session = session
         frame1 = Frame(frame)
         frame1.pack(side=TOP, fill=X, pady=20)
-        self.choose_project_label = Label(frame1, text='Enter project name:')
+        self.choose_project_label = Label(frame1, text='Project name:')
         self.choose_project_entry = Entry(frame1)
-        self.choose_user_label = Label(frame1, text='Enter user name:')
+        self.choose_user_label = Label(frame1, text='User name:')
         self.choose_user_entry = Entry(frame1)
+        self.choose_key_label = Label(frame1, text='API Key:')
+        self.choose_key_entry = Entry(frame1)
+        self.choose_url_label = Label(frame1, text='Server URL:')
+        self.choose_url_entry = Entry(frame1)
         self.choose_project_button = Button(frame1, text='Search', command=self.search_project)
         self.choose_project_err_msg = Label(frame1, text='Cannot find that project, please check your project name', fg='red')
         self.choose_project_label.grid(row=0, column=0, padx=10)
         self.choose_project_entry.grid(row=0, column=1, padx=10)
         self.choose_user_label.grid(row=0, column=2, padx=10)
         self.choose_user_entry.grid(row=0, column=3, padx=10)
-        self.choose_project_button.grid(row=0, column=4, padx=10)
+        self.choose_key_label.grid(row=0, column=4, padx=10)
+        self.choose_key_entry.grid(row=0, column=5, padx=10)
+        self.choose_url_label.grid(row=0, column=6, padx=10)
+        self.choose_url_entry.grid(row=0, column=7, padx=10)
+        self.choose_project_button.grid(row=0, column=8, padx=10)
         self.submit_button = Button(frame1, text='submit', bg='green', command=self.submit)
         self.frame2 = Frame(frame)
         self.search_task_label = Label(self.frame2, text='Enter task name:')
@@ -70,26 +75,32 @@ class quick_notes_gui:
         self.search_labelframe = LabelFrame(self.frame2, text="Search Result ---- Click to add task")
         self.frame3 = Frame(frame)
         self.tasks = []
-
-
+        self.k = ThreadJob(self.save, threading.Event(), AUTO_SAVE_TIME)
+        app.protocol('WM_DELETE_WINDOW', lambda app=app:self.quit(app))
 
     def search_project(self):
         '''search project by name'''
         self.choose_project_err_msg.grid_remove()
         project_name = self.choose_project_entry.get()
         user_name = self.choose_user_entry.get()
+        api_key = self.choose_key_entry.get()
+        self.server_url = self.choose_url_entry.get()
+        self.server_url = 'http://192.168.9.82/'
+        api_key = 'afe3ba42-baba-46b1-b47b-35206f34488f'
+        user_name = 'yuan.cui'
+        project_name = 'testing'
+        try:
+            self.session = get_session(self.server_url, api_key, user_name)
+            self.user = get_user(self.session, user_name)
+        except Exception:
+            self.choose_project_err_msg['text'] = 'Sorry! Url, api-key and name cannot match'
+            self.choose_project_err_msg.grid(row=0, column=9, padx=10)
+            return
         try:
             self.project = get_project(self.session, project_name)
         except Exception:
-            self.choose_project_err_msg.grid(row=0, column=5, padx=10)
+            self.choose_project_err_msg.grid(row=0, column=9, padx=10)
             return
-        try:
-            self.user = get_user(self.session, user_name)
-        except Exception:
-            self.choose_project_err_msg['text'] = 'Cannot find that user, please check your user name'
-            self.choose_project_err_msg.grid(row=0, column=5, padx=10)
-            return
-
         self.pack_frame1()
         self.tasks = get_tasks_from_project(self.project)
         self.pack_frame2()
@@ -101,10 +112,11 @@ class quick_notes_gui:
         self.choose_user_entry.grid_remove()
         self.choose_user_label.grid_remove()
         self.choose_project_button.grid_remove()
-        # when project and user are confirmed, auto save program starts
-        k = ThreadJob(self.save, event, AUTO_SAVE_TIME)
-        if self.project and self.user:
-            k.start()
+        self.choose_key_label.grid_remove()
+        self.choose_key_entry.grid_remove()
+        self.choose_url_label.grid_remove()
+        self.choose_url_entry.grid_remove()
+        self.submit_button.grid_remove()
 
     def pack_frame2(self):
         '''show frame2 in window'''
@@ -130,7 +142,7 @@ class quick_notes_gui:
 
     def use_task(self, event):
         '''add tasks by click task name button'''
-        self.submit_button.grid(row=0, column=4, sticky=E, padx=50)
+        self.submit_button.grid(row=0, column=10, sticky=E, padx=50)
         task_frame = Frame(self.frame3)
         task_name = event.widget.cget("text")
         if task_name in self.save_message.keys():
@@ -165,38 +177,54 @@ class quick_notes_gui:
 
     def submit(self):
         '''submit function'''
+        self.k.stop()
+        self.k = ThreadJob(self.save, threading.Event(), AUTO_SAVE_TIME)
         task_frames = self.frame3.winfo_children()
         for task_frame in task_frames:
-            submit_note = task_frame.winfo_children()[2].get("1.0",'end-1c')
-            self.submit_info[task_frame.winfo_children()[0]['text']] = submit_note.replace("\n", "<br>")
-        submit_info_to_ftrack(self.submit_info, self.session, self.user, self.project)
-        for child in self.frame3.winfo_children():
-            child.destroy()
+            for tk_el in task_frame.winfo_children():
+                if str(tk_el.__class__) == 'Tkinter.Text':
+                    submit_note = tk_el.get("1.0",'end-1c')
+                elif str(tk_el.__class__) == 'Tkinter.Label':
+                    label = tk_el['text']
+            self.submit_info[label] = submit_note.replace("\n", "<br>")
+        try:
+            submit_info_to_ftrack(self.submit_info, self.session, self.user, self.project)
+            for child in self.frame3.winfo_children():
+                child.destroy()
+            self.save_message = collections.OrderedDict()
+        except Exception:
+            return
+        self.submit_info = {}
+
 
     def quit(self, app):
         '''quit GUI'''
         app.destroy()
+        self.k.stop()
 
-
-    def new_project(self, arg):
+    def new_project(self, app):
         '''create new project'''
-        app, session = arg
-        quick_notes_gui(app, session)
+        quick_notes_gui(app)
+        self.k.stop()
 
     def save(self):
         '''save data in project'''
-        if self.choose_project_label['text'] == 'Enter project name:':
-            return 0
-        else:
+        if self.project and self.user:
             project_id = self.project['id']
             user_id = self.user['id']
+            for k,v in self.save_message.items():
+                print k
+                print v
             with open('save.p', 'wb') as f:
                 pickle.dump({
+                    "server_url": self.server_url,
                     "project_id": project_id,
                     "user_id": user_id,
                     "notes": self.save_message
                 }, f)
+                print 'save'
             return 1
+        return 0
 
     def save_project(self):
         '''save project reflect result with pop-up window'''
@@ -207,16 +235,26 @@ class quick_notes_gui:
 
     def load_project(self):
         '''load project'''
+        if not self.user:
+            tkMessageBox.showinfo("Failure", "Please login first!")
+            return
+        self.k.stop()
+        self.k = ThreadJob(self.save, threading.Event(), AUTO_SAVE_TIME)
         try:
             with open('save.p', 'rb') as f:
                 save_info = pickle.load(f)
         except Exception:
             tkMessageBox.showinfo("Failure", "Loading failure!")
+            return
         project_id = save_info['project_id']
         user_id = save_info['user_id']
         notes_msg = save_info['notes']
+        server_url = save_info['server_url']
+        if server_url!=self.server_url or self.user['id']!=user_id:
+            tkMessageBox.showinfo("Warning", "Cannot load with different user account")
+            return
         self.project = self.session.query("Project where id is {0}".format(project_id)).one()
-        self.user = self.session.query("User where id is {0}".format(user_id)).one()
+        # self.user = self.session.query("User where id is {0}".format(user_id)).one()
         self.tasks = get_tasks_from_project(self.project)
         self.save_message = notes_msg
         self.search_labelframe.grid_remove()
@@ -228,8 +266,10 @@ class quick_notes_gui:
             self.submit_button.grid_forget()
             self.task_frame_count = 0
         else:
+            for widget in self.frame3.winfo_children():
+                widget.destroy()
             self.pack_frame1()
-            self.submit_button.grid(row=0, column=4, sticky=E, padx=50)
+            self.submit_button.grid(row=0, column=10, sticky=E, padx=50)
             self.pack_frame2()
             for key,value in notes_msg.items():
                 task_name = key
@@ -252,7 +292,8 @@ class quick_notes_gui:
         '''save result when mouse move out of text area'''
         note_content = event.widget.get("1.0", 'end-1c')
         self.save_message[task_name] = note_content
-
+        if not self.k.is_running and self.project and self.user:
+            self.k.start()
 
 def get_tasks_from_project(project):
     '''pick tasks and milestones up from project'''
@@ -263,12 +304,12 @@ def get_tasks_from_project(project):
             result.append(desc)
     return result
 
-def get_session():
+def get_session(server_url, api_key, api_user):
     '''get session from ftrack'''
     return ftrack_api.Session(
-        server_url=SERVER_URL,
-        api_key=API_KEY,
-        api_user=API_USER
+        server_url=server_url,
+        api_key=api_key,
+        api_user=api_user
     )
 
 def get_project(session, project_name):
@@ -315,19 +356,29 @@ class ThreadJob(threading.Thread):
         self.event = event
         self.interval = interval
         super(ThreadJob,self).__init__()
+        self._stop_event = threading.Event()
+        self.is_running = False
 
     def run(self):
+        self.is_running = True
+        print "run"
         while not self.event.wait(self.interval):
+            if self.stopped():
+                break
             self.callback()
+        self._stop_event = threading.Event()
 
+    def stop(self):
+        print "stop"
+        self.is_running = False
+        self._stop_event.set()
 
-
-event = threading.Event()
+    def stopped(self):
+        return self._stop_event.is_set()
 
 def main():
-    session = get_session()
     app = Tk()
-    quick_notes_gui(app, session)
+    quick_notes_gui(app)
     app.mainloop()
 
 if __name__ == "__main__":

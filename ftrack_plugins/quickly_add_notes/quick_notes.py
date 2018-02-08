@@ -24,7 +24,7 @@ class quick_notes_gui:
         for widget in app.winfo_children():
             widget.destroy()
         app.title("Quick notes")
-        app.geometry('1024x800')
+        app.geometry('1400x800')
         canvas = Canvas(app, borderwidth=0)
         frame = Frame(canvas)
         vsb = Scrollbar(app, orient="vertical", command=canvas.yview)
@@ -53,7 +53,7 @@ class quick_notes_gui:
         self.choose_url_label = Label(frame1, text='Server URL:')
         self.choose_url_entry = Entry(frame1)
         self.choose_project_button = Button(frame1, text='Search', command=self.search_project)
-        self.choose_project_err_msg = Label(frame1, text='Cannot find that project, please check your project name', fg='red')
+        self.choose_project_err_msg = Label(frame1, text='Cannot find project, check project name', fg='red')
         self.choose_project_label.grid(row=0, column=0, padx=10)
         self.choose_project_entry.grid(row=0, column=1, padx=10)
         self.choose_user_label.grid(row=0, column=2, padx=10)
@@ -85,13 +85,13 @@ class quick_notes_gui:
         api_key = self.choose_key_entry.get()
         self.server_url = self.choose_url_entry.get()
         # unify url format
-        if self.server_url[-1] == '/':
+        if self.server_url and self.server_url[-1] == '/':
             self.server_url = self.server_url[:-1]
         try:
             self.session = get_session(self.server_url, api_key, user_name)
             self.user = get_user(self.session, user_name)
         except Exception:
-            self.choose_project_err_msg['text'] = 'Sorry! Url, api-key and name cannot match'
+            self.choose_project_err_msg['text'] = 'Sorry: invalid login info'
             self.choose_project_err_msg.grid(row=0, column=9, padx=10)
             return
         try:

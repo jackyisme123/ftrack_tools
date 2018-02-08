@@ -1,0 +1,8 @@
+http://www.pyinstaller.org/
+
+PyInstaller Quickstart:
+-- pip install pyinstaller
+-- pyinstaller yourprogram.py
+
+This will generate the bundle in a subdirectory called dist
+yourprogram.exe can be found from subdirectory

@@ -329,7 +329,7 @@ def submit_info_to_ftrack(info, session, user, project):
     for key, value in info.items():
         task_name = key
         note_content = value
-        task = session.query("Task where name is '{0}' and project.name is '{1}'".format(task_name, project['full_name'])).first()
+        task = session.query("Task where name is '{0}' and project.full_name is '{1}'".format(task_name, project['full_name'])).first()
         # empty note won't be submitted
         if value != '':
             task.create_note(note_content, user, category=catagory)

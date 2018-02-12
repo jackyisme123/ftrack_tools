@@ -164,6 +164,7 @@ class quick_notes_gui:
         self.project = None
         self.search_labelframe.grid_remove()
         self.frame2.pack_forget()
+        self.save_message = collections.OrderedDict()
         for widget in self.frame3.winfo_children():
             widget.destroy()
         self.frame3.pack_forget()
